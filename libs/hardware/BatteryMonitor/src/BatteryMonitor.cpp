@@ -511,6 +511,15 @@ uint16_t readDiptyxBatteryMillivolts(int8_t adcPin, float dividerMultiplier) {
   if (valid >= DIPTYX_ADC_SAMPLES / 2) {
     lastGoodMv = static_cast<uint16_t>((sum / valid) * dividerMultiplier);
   }
+  // Diagnostic (serial log): lets the percentage be checked against a real voltage. Only prints when it moves.
+  static uint16_t lastLoggedMv = 0;
+  const int diff = static_cast<int>(lastGoodMv) - static_cast<int>(lastLoggedMv);
+  if (Serial && (diff >= 10 || diff <= -10 || valid < DIPTYX_ADC_SAMPLES / 2)) {
+    Serial.printf("[%lu] [BAT] %u mV at cell (pin avg %lu mV x%.1f, %d/%d samples valid)\n", millis(), lastGoodMv,
+                  valid ? static_cast<unsigned long>(sum / valid) : 0UL, static_cast<double>(dividerMultiplier), valid,
+                  DIPTYX_ADC_SAMPLES);
+    lastLoggedMv = lastGoodMv;
+  }
   return lastGoodMv;
 }
 }  // namespace
