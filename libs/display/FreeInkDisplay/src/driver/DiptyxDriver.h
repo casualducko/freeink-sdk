@@ -27,6 +27,18 @@ class DiptyxDriver : public PanelDriver {
   void deepSleep(EpdBus& bus) override;
   void display(EpdBus& bus, const uint8_t* fb, const uint8_t* prev, RefreshMode mode, bool turnOff) override;
 
+  // B/W only. Callers (the reader's anti-aliasing and image passes) still invoke the grayscale entry points. The
+  // PanelDriver defaults would run an ordinary refresh with the facade framebuffer, which at that point holds a
+  // gray-plane render, so the page would be replaced by an outline-only image. Do nothing instead: the B/W page
+  // shown before the gray pass stays on the panel.
+  void displayGray(EpdBus& bus, const uint8_t* fb, bool turnOff, const unsigned char* lut, bool factoryMode) override {
+    (void)bus; (void)fb; (void)turnOff; (void)lut; (void)factoryMode;
+  }
+  void displayGrayCalibration(EpdBus& bus, const uint8_t* fb, uint16_t customX, uint16_t customY, uint16_t customW,
+                              uint16_t customH) override {
+    (void)bus; (void)fb; (void)customX; (void)customY; (void)customW; (void)customH;
+  }
+
  private:
   void initController(EpdBus& bus, bool full);
   void sendLuts(EpdBus& bus, bool full);
