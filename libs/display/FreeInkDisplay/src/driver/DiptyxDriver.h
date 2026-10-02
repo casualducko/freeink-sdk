@@ -21,6 +21,7 @@ class DiptyxDriver : public PanelDriver {
   uint32_t spiHz() const override;
   BusyPolarity busyPolarity() const override { return BusyPolarity::ActiveLow; }  // BUSY high = idle
   PanelGeometry geometry() const override;
+  int8_t coCs() const override { return 21; }  // right panel CS: share SCLK/MOSI, keep it deselected
 
   void begin(EpdBus& bus) override;
   void deepSleep(EpdBus& bus) override;

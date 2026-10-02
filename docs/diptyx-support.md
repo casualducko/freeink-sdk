@@ -1,0 +1,42 @@
+# Diptyx dual-screen e-reader support
+
+`-DFREEINK_DEVICE_DIPTYX=1` (`Board::Diptyx`, profile name `diptyx`). **Left panel only** so far.
+
+ESP32-S3 (16 MB quad flash, 8 MB octal PSRAM), two 648x480 B/W e-paper panels (Waveshare 5.83" B V2
+class, UC8179-family command set), SDMMC 1-bit SD, seven buttons. Hardware: <https://diptyx.dev>.
+Stock firmware (MIT): <https://github.com/MartijndenHoed/Diptyx>.
+
+## Pin evidence
+
+Taken from the stock firmware sources (`epdif`, `epd5in83b_V2`, `device`, `main`) and checked on a unit
+with a test app.
+
+| Function | Pins |
+|---|---|
+| EPD SPI (shared by both panels) | SCLK 11, MOSI 12, no MISO, mode 0, 7 MHz |
+| Left panel | CS 10, DC 9, RST 8, BUSY 7 (BUSY high = idle) |
+| Right panel (not driven yet) | CS 21, DC 18, RST 17, BUSY 14. CS 21 is held high via `DiptyxDriver::coCs()` |
+| SD (SDMMC 1-bit, internal pull-ups) | CLK 41, CMD 40, D0 39 |
+| Buttons (active-low, pull-ups), tested | page-left 5, arrow-left 1, joystick press 0 (boot pin), up 2, down 3, arrow-right 4, page-right 6 |
+| Power latch | GPIO38 HIGH early in boot (stock also gpio_hold_en) |
+| Other | status LED 48, rumble 47, USB power trigger 15, battery sense gate 43 (HIGH to sample), battery ADC = ADC2 ch2 = GPIO13 with a 2x divider |
+
+Button mapping in the profile: back = arrow-left (1), confirm = joystick press (0), left/right = page-left/right (5/6),
+up/down = 2/3. Arrow-right (4) and a power key are unmapped.
+
+## Panel
+
+`DiptyxDriver` replays the stock sequence: reset, POWER SETTING (0x01) / VCOM 0x82 / BTST 0x06 / PLL 0x30 / 0x52 /
+PWS 0xE3 / 0x41, POWER ON, PSR 0x3F,0x09 (register-LUT mode), TRES 648x480, 0x15, CDI 0x18,0x07, TCON 0x22, then the five
+42-byte LUT registers (full or partial), new-frame data (0x13), refresh (0x12), POWER OFF. It does this before every
+refresh. This differs from `Uc8179Driver`, which uses the OTP waveforms. VCOM is the stock default 23; the stock firmware keeps a
+per-unit value in NVS that is not read here.
+
+Verified on hardware: a 1 bit in the data plane is BLACK (framebuffer is inverted on output), and the left panel is
+mounted rotated 180 degrees (stock flips it). The glass sits portrait in the case, so the reader's own
+portrait orientation handles the 90 degree rotation.
+
+## Not done
+
+Right panel; battery gauge (GPIO13 behind the GPIO43 gate); USB detect (GPIO15, polarity unverified); deep-sleep wake;
+LED/rumble; grayscale (B/W only); VCOM from NVS.
