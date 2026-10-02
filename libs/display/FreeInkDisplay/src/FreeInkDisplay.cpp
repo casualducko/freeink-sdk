@@ -1040,9 +1040,35 @@ void FreeInkDisplay::setCustomLUT(bool enabled, const unsigned char* lutData) {
   if (_driver) _driver->setCustomLut(_bus, enabled, lutData);
 }
 
+void FreeInkDisplay::selectPanel(PanelSide side) {
+#if FREEINK_DRIVER_DIPTYX
+  if (!_driver || side == _panelSide) return;
+  cancelGrayscalePass();
+  syncPendingAsync();
+  const auto s = side == PanelSide::Right ? DiptyxDriver::Side::Right : DiptyxDriver::Side::Left;
+  _panelSide = side;
+  _driver = &diptyxDriver(s);
+  // Re-point the shared bus at the other panel's CS/DC/RST/BUSY.
+  _bus.begin(DiptyxDriver::pins(s), _driver->spiHz(), _driver->busyPolarity(), _driver->spiMiso(), _driver->coCs());
+  if (side == PanelSide::Right && !_rightPanelStarted) {
+    _driver->begin(_bus);
+    _rightPanelStarted = true;
+  }
+#else
+  (void)side;
+#endif
+}
+
 void FreeInkDisplay::deepSleep() {
   cancelGrayscalePass();
   syncPendingAsync();
+#if FREEINK_DRIVER_DIPTYX
+  if (_rightPanelStarted) {  // put the right panel to sleep too, then finish with the left
+    selectPanel(PanelSide::Right);
+    _driver->deepSleep(_bus);
+  }
+  selectPanel(PanelSide::Left);
+#endif
   if (_driver) _driver->deepSleep(_bus);
 }
 

@@ -47,6 +47,13 @@ uint8_t reverseBits(uint8_t b) {
 }
 }  // namespace
 
+EpdPins DiptyxDriver::pins(Side side) {
+  // SCLK MOSI CS DC RST BUSY
+  return side == Side::Left ? EpdPins{11, 12, 10, 9, 8, 7, -1} : EpdPins{11, 12, 21, 18, 17, 14, -1};
+}
+
+int8_t DiptyxDriver::coCs() const { return _side == Side::Left ? 21 : 10; }
+
 uint32_t DiptyxDriver::spiHz() const {
   return BoardConfig::ACTIVE.displaySpiHz != 0 ? BoardConfig::ACTIVE.displaySpiHz : 7000000;
 }
@@ -111,19 +118,25 @@ void DiptyxDriver::initController(EpdBus& bus, bool full) {
   sendLuts(bus, full);
 }
 
-// Left panel mounted rotated 180 degrees: reverse row order, byte order and bit order, and
-// invert (1 = black on this panel). Sent as two CS bursts, like stock.
+// Left panel mounted rotated 180 degrees: reverse row order, byte order and bit order. The right panel is sent
+// as is. Both are inverted (1 = black on this panel). Sent as two CS bursts, like stock.
 void DiptyxDriver::writePlane(EpdBus& bus, const uint8_t* fb) {
   bus.cmd(CMD_DTM2);
   uint8_t row[ROW_BYTES];
+  const bool flip = _side == Side::Left;
   bus.beginTxn();
   for (uint16_t j = 0; j < PANEL_H; j++) {
     if (j == PANEL_H / 2) {
       bus.endTxn();
       bus.beginTxn();
     }
-    const uint8_t* src = fb + static_cast<uint32_t>(PANEL_H - 1 - j) * ROW_BYTES;
-    for (uint16_t i = 0; i < ROW_BYTES; i++) row[i] = static_cast<uint8_t>(~reverseBits(src[ROW_BYTES - 1 - i]));
+    if (flip) {
+      const uint8_t* src = fb + static_cast<uint32_t>(PANEL_H - 1 - j) * ROW_BYTES;
+      for (uint16_t i = 0; i < ROW_BYTES; i++) row[i] = static_cast<uint8_t>(~reverseBits(src[ROW_BYTES - 1 - i]));
+    } else {
+      const uint8_t* src = fb + static_cast<uint32_t>(j) * ROW_BYTES;
+      for (uint16_t i = 0; i < ROW_BYTES; i++) row[i] = static_cast<uint8_t>(~src[i]);
+    }
     bus.rawWriteBytes(row, ROW_BYTES);
   }
   bus.endTxn();
@@ -164,9 +177,10 @@ void DiptyxDriver::deepSleep(EpdBus& bus) {
   bus.data(0xA5);
 }
 
-PanelDriver& diptyxDriver() {
-  static DiptyxDriver instance;
-  return instance;
+PanelDriver& diptyxDriver(DiptyxDriver::Side side) {
+  static DiptyxDriver left(DiptyxDriver::Side::Left);
+  static DiptyxDriver right(DiptyxDriver::Side::Right);
+  return side == DiptyxDriver::Side::Left ? static_cast<PanelDriver&>(left) : static_cast<PanelDriver&>(right);
 }
 
 }  // namespace freeink

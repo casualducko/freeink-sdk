@@ -19,10 +19,16 @@ namespace freeink {
 
 class DiptyxDriver : public PanelDriver {
  public:
+  // Both panels share SCLK 11 / MOSI 12; each has its own CS/DC/RST/BUSY. The left panel is mounted rotated 180
+  // degrees (stock flips it); the right one is not.
+  enum class Side : uint8_t { Left, Right };
+  explicit DiptyxDriver(Side side = Side::Left) : _side(side) {}
+  static EpdPins pins(Side side);
+
   uint32_t spiHz() const override;
   BusyPolarity busyPolarity() const override { return BusyPolarity::ActiveLow; }  // BUSY high = idle
   PanelGeometry geometry() const override;
-  int8_t coCs() const override { return 21; }  // right panel CS: share SCLK/MOSI, keep it deselected
+  int8_t coCs() const override;  // the OTHER panel's CS: shares SCLK/MOSI, keep it deselected
 
   void begin(EpdBus& bus) override;
   void deepSleep(EpdBus& bus) override;
@@ -48,8 +54,9 @@ class DiptyxDriver : public PanelDriver {
   static constexpr uint8_t kMaxPartialsInRow = 30;  // safety cap; the stock firmware's own budget is 5
   uint8_t _partialsRemaining = 0;                   // 0 forces a full refresh next
   bool _isScreenOn = false;
+  Side _side;
 };
 
-PanelDriver& diptyxDriver();
+PanelDriver& diptyxDriver(DiptyxDriver::Side side = DiptyxDriver::Side::Left);
 
 }  // namespace freeink
