@@ -1,6 +1,12 @@
 #include "DiptyxDriver.h"
 
 #include <BoardConfig.h>
+#include <nvs.h>
+
+#include <cstdlib>
+#include <cstring>
+#include <memory>
+#include <new>
 
 #if FREEINK_DRIVER_DIPTYX
 
@@ -28,7 +34,7 @@ constexpr uint8_t CMD_PWS = 0xE3;
 constexpr uint16_t PANEL_W = 648;
 constexpr uint16_t PANEL_H = 480;
 constexpr uint16_t ROW_BYTES = PANEL_W / 8;  // 81
-constexpr uint8_t VCOM_DC = 23;              // stock default; per-unit value lives in the stock NVS settings
+constexpr uint8_t VCOM_DEFAULT = 23;         // stock default; each unit stores its own value (see readStockVcom)
 constexpr uint8_t LUT_LEN = 42;
 
 // Stock waveforms: first 6 bytes of each 42-byte register, remainder zero.
@@ -38,6 +44,31 @@ const uint8_t LUT_FULL[5][6] = {{0x00, 0x1E, 0x1E, 0x1E, 0x01, 0x01}, {0x60, 0x1
 const uint8_t LUT_PARTIAL[5][6] = {{0x00, 0x14, 0x01, 0x00, 0x00, 0x01}, {0x00, 0x14, 0x01, 0x00, 0x00, 0x01},
                                    {0x80, 0x14, 0x01, 0x00, 0x00, 0x01}, {0x40, 0x14, 0x01, 0x00, 0x00, 0x01},
                                    {0x00, 0x14, 0x01, 0x00, 0x00, 0x01}};
+
+// Each Diptyx stores its own panel voltage (VCOM) in the stock firmware's settings: NVS namespace "device", key
+// "settings", a JSON blob containing "vcomLeft" / "vcomRight". Read-only; falls back to the stock default when the
+// settings are missing (a unit that never ran the stock firmware) or out of range. Needs nvs_flash_init() to have run,
+// which the Arduino core does before setup().
+uint8_t readStockVcom(DiptyxDriver::Side side) {
+  const char* key = side == DiptyxDriver::Side::Left ? "\"vcomLeft\"" : "\"vcomRight\"";
+  uint8_t value = VCOM_DEFAULT;
+  nvs_handle_t handle;
+  if (nvs_open("device", NVS_READONLY, &handle) != ESP_OK) return value;
+  size_t len = 0;
+  if (nvs_get_blob(handle, "settings", nullptr, &len) == ESP_OK && len > 0 && len <= 4096) {
+    std::unique_ptr<char[]> json(new (std::nothrow) char[len + 1]);
+    if (json && nvs_get_blob(handle, "settings", json.get(), &len) == ESP_OK) {
+      json[len] = '\0';
+      if (const char* p = strstr(json.get(), key)) {
+        p = strchr(p + strlen(key), ':');
+        const long v = p ? strtol(p + 1, nullptr, 10) : 0;
+        if (v >= 1 && v <= 127) value = static_cast<uint8_t>(v);
+      }
+    }
+  }
+  nvs_close(handle);
+  return value;
+}
 
 uint8_t reverseBits(uint8_t b) {
   b = static_cast<uint8_t>((b & 0xF0) >> 4 | (b & 0x0F) << 4);
@@ -82,7 +113,7 @@ void DiptyxDriver::initController(EpdBus& bus, bool full) {
   bus.data(0x3F);  // VDL=-15V
   bus.data(0x03);
   bus.cmd(CMD_VCOM_DC);
-  bus.data(VCOM_DC);
+  bus.data(_vcom);
   bus.cmd(CMD_BOOSTER_SOFT_START);
   bus.data(0x17);
   bus.data(0x17);
@@ -146,6 +177,10 @@ void DiptyxDriver::begin(EpdBus& bus) {
   (void)bus;
   _partialsRemaining = 0;  // first refresh is a full one
   _isScreenOn = false;
+  _vcom = readStockVcom(_side);
+  if (Serial) {
+    Serial.printf("[%lu] [DIPTYX] %s panel VCOM %u\n", millis(), _side == Side::Left ? "left" : "right", _vcom);
+  }
 }
 
 void DiptyxDriver::display(EpdBus& bus, const uint8_t* fb, const uint8_t* prev, RefreshMode mode, bool turnOff) {

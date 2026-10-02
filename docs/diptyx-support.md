@@ -30,7 +30,8 @@ unmapped. The bottom hint bar shows three hints (Back / Select / Next) over the 
 
 `BatteryMonitor` reads ADC2 ch2 (GPIO13) with a 2x divider. The divider is only connected while GPIO43 is HIGH, so each read
 releases the pad hold, drives GPIO43 high for 20 ms, averages 16 samples, then drops it low and re-holds it (stock
-`Device::getBatteryVoltage()`). ADC2 is unreadable while Wi-Fi runs; a failed read keeps the last good value instead of showing 0%.
+`Device::getBatteryVoltage()`). ADC2 is unreadable while Wi-Fi runs; a failed read keeps the last good value instead of showing 0%. A good reading is cached for 10 s because the
+status bar asks on every page render and a read blocks for ~20 ms.
 The percentage uses the SDK's generic Li-ion table, not the stock 6-point table.
 
 ## Sleep
@@ -47,8 +48,8 @@ the rail stays up and the board behaves like standby.
 PWS 0xE3 / 0x41, POWER ON, PSR 0x3F,0x09 (register-LUT mode), TRES 648x480, 0x15, CDI 0x18,0x07, TCON 0x22, then the five
 42-byte LUT registers (full or partial), new-frame data (0x13), refresh (0x12), POWER OFF. It does this before every
 refresh. FULL and HALF requests use the full LUT, FAST uses the partial LUT, and the host schedules the full refreshes
-(a safety cap forces one after 30 partials; stock used 5). This differs from `Uc8179Driver`, which uses the OTP waveforms. VCOM is the stock default 23; the stock firmware keeps a
-per-unit value in NVS that is not read here.
+(a safety cap forces one after 30 partials; stock used 5). This differs from `Uc8179Driver`, which uses the OTP waveforms. VCOM (register 0x82) is read per panel from the stock firmware's settings (NVS namespace `device`, key `settings`, JSON `vcomLeft` / `vcomRight`),
+read-only; it falls back to the stock default 23 when the settings are missing or out of range. The values used are logged at boot (`[DIPTYX] left panel VCOM ...`).
 
 Verified on hardware: a 1 bit in the data plane is BLACK (framebuffer is inverted on output), and the left panel is
 mounted rotated 180 degrees (stock flips it). The glass sits portrait in the case, so the reader's own
@@ -56,4 +57,4 @@ portrait orientation handles the 90 degree rotation.
 
 ## Not done
 
-Right panel; USB wake; LED/rumble; grayscale (B/W only); VCOM from NVS.
+Right panel; USB wake; LED/rumble; grayscale (B/W only).

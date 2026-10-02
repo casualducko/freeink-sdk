@@ -200,6 +200,11 @@ void FreeInkDisplay::selectDriver() {
 void FreeInkDisplay::begin() {
   cancelGrayscalePass();
   selectDriver();
+#if FREEINK_DRIVER_DIPTYX
+  // selectDriver() always picks the left driver; keep the panel selection consistent with it.
+  _panelSide = PanelSide::Left;
+  _rightPanelStarted = false;
+#endif
 
   // External-library drivers (e.g. M5GFX) own the SPI/display hardware; only
   // bring up FreeInk's bus for native controller drivers.
@@ -1050,6 +1055,7 @@ void FreeInkDisplay::selectPanel(PanelSide side) {
   _driver = &diptyxDriver(s);
   // Re-point the shared bus at the other panel's CS/DC/RST/BUSY.
   _bus.begin(DiptyxDriver::pins(s), _driver->spiHz(), _driver->busyPolarity(), _driver->spiMiso(), _driver->coCs());
+  _driver->setBackgroundHint(_inverted);
   if (side == PanelSide::Right && !_rightPanelStarted) {
     _driver->begin(_bus);
     _rightPanelStarted = true;

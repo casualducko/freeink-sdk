@@ -492,6 +492,12 @@ constexpr int DIPTYX_ADC_SAMPLES = 16;
 // which the Wi-Fi driver owns while it is running, so reads can fail; the caller keeps the last good value.
 uint16_t readDiptyxBatteryMillivolts(int8_t adcPin, float dividerMultiplier) {
   static uint16_t lastGoodMv = 0;
+  static unsigned long lastReadMs = 0;
+  // The status bar asks for the level on every page render (twice per turn in the two-page spread). A read blocks for
+  // ~20 ms and drives the sense gate, so serve a recent value instead of sampling every time.
+  constexpr unsigned long CACHE_MS = 10000;
+  if (lastGoodMv != 0 && millis() - lastReadMs < CACHE_MS) return lastGoodMv;
+  lastReadMs = millis();
   const auto gate = static_cast<gpio_num_t>(DIPTYX_BATTERY_SENSE_GATE);
   gpio_hold_dis(gate);
   pinMode(DIPTYX_BATTERY_SENSE_GATE, OUTPUT);

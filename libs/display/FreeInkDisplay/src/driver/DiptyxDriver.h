@@ -55,6 +55,7 @@ class DiptyxDriver : public PanelDriver {
   uint8_t _partialsRemaining = 0;                   // 0 forces a full refresh next
   bool _isScreenOn = false;
   Side _side;
+  uint8_t _vcom = 23;  // display voltage (register 0x82); read from the stock settings in begin()
 };
 
 PanelDriver& diptyxDriver(DiptyxDriver::Side side = DiptyxDriver::Side::Left);

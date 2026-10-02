@@ -34,7 +34,8 @@ bool diptyxAnyButtonPressed() {
   return false;
 }
 
-// Release the digital pad state and give each button an RTC pull-up so the idle level survives deep sleep.
+// Release the digital pad state and give each button an RTC pull-up so the idle level survives deep sleep. EXT1 wake
+// reads the RTC pad, so these pulls (not the digital ones) keep the idle level high; do not remove them.
 void diptyxConfigureWakeButtons() {
   for (const int8_t pin : DIPTYX_WAKE_PINS) {
     const auto g = static_cast<gpio_num_t>(pin);
