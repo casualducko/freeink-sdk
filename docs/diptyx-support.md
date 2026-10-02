@@ -37,8 +37,9 @@ The percentage uses the SDK's generic Li-ion table, not the stock 6-point table.
 
 Like stock, "sleep" is deep sleep with the GPIO38 latch held (the board stays powered). `PowerManager` wakes it from any of the seven
 buttons (EXT1 any-low, RTC pull-ups, GPIO 0-6 are all RTC pins) and waits up to 5 s for a held button to be released first. The power
-button (GPIO42) is not an RTC pin and cannot wake deep sleep; USB (GPIO15) is not a wake source yet. A hard power-off (release the GPIO38
-hold and drive it low, as stock `Device::shutdown()` does) is not wired in.
+button (GPIO42) is not an RTC pin and cannot wake deep sleep; USB (GPIO15) is not a wake source yet. A hard power-off (CrossPoint: hold the power button) releases the GPIO38 latch and drives it low, as stock `Device::shutdown()` does; the physical
+power button then cold-boots the board, and it has to be held for ~3 s because the rail is only latched once firmware has booted. With USB attached
+the rail stays up and the board behaves like standby.
 
 ## Panel
 
@@ -55,4 +56,4 @@ portrait orientation handles the 90 degree rotation.
 
 ## Not done
 
-Right panel; hard power-off; USB wake; LED/rumble; grayscale (B/W only); VCOM from NVS.
+Right panel; USB wake; LED/rumble; grayscale (B/W only); VCOM from NVS.
