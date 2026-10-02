@@ -30,8 +30,10 @@
 #include "driver/Uc8279Driver.h"
 #endif
 #if FREEINK_DRIVER_UC8179
-#include "driver/DiptyxDriver.h"
 #include "driver/Uc8179Driver.h"
+#endif
+#if FREEINK_DRIVER_DIPTYX
+#include "driver/DiptyxDriver.h"
 #endif
 #if FREEINK_DRIVER_UC8279_X4
 #include "driver/Uc8279X4Driver.h"
