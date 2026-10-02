@@ -25,6 +25,13 @@ with a test app.
 Button mapping in the profile: back = arrow-left (1), confirm = joystick press (0), left/right = page-left/right (5/6),
 up/down = 2/3, power = 42 (active-high), USB detect = 16. Arrow-right (4) is unmapped.
 
+## Battery
+
+`BatteryMonitor` reads ADC2 ch2 (GPIO13) with a 2x divider. The divider is only connected while GPIO43 is HIGH, so each read
+releases the pad hold, drives GPIO43 high for 20 ms, averages 16 samples, then drops it low and re-holds it (stock
+`Device::getBatteryVoltage()`). ADC2 is unreadable while Wi-Fi runs; a failed read keeps the last good value instead of showing 0%.
+The percentage uses the SDK's generic Li-ion table, not the stock 6-point table.
+
 ## Sleep
 
 Like stock, "sleep" is deep sleep with the GPIO38 latch held (the board stays powered). `PowerManager` wakes it from any of the seven
@@ -46,4 +53,4 @@ portrait orientation handles the 90 degree rotation.
 
 ## Not done
 
-Right panel; battery gauge (GPIO13 behind the GPIO43 gate); hard power-off; USB wake; LED/rumble; grayscale (B/W only); VCOM from NVS.
+Right panel; hard power-off; USB wake; LED/rumble; grayscale (B/W only); VCOM from NVS.
