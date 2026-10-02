@@ -5,8 +5,9 @@
 // firmware's (epd5in83b_V2.cpp), verified on hardware:
 //   reset -> POWER SETTING/VCOM/BTST/PLL/PWS -> POWER ON -> panel settings (register LUT mode,
 //   PSR 0x3F) -> LUTs -> new-frame data (0x13) -> refresh (0x12) -> POWER OFF.
-// The controller is re-initialised before every refresh, like stock. A FULL refresh uses the full
-// LUT; FAST/HALF use the partial LUT, promoted to a full refresh every kPartialsBeforeFull frames.
+// The controller is re-initialised before every refresh, like stock. FULL and HALF refreshes use the full
+// LUT (the host schedules them, e.g. CrossPoint's "refresh every N pages"); FAST uses the partial LUT. A high
+// safety cap (kMaxPartialsInRow) still forces a full refresh if the host never asks for one.
 // A 1 bit in the data plane is BLACK with these settings, so the framebuffer is inverted on the
 // way out, and the left panel is mounted rotated 180 degrees (stock flips it the same way).
 //
@@ -44,8 +45,8 @@ class DiptyxDriver : public PanelDriver {
   void sendLuts(EpdBus& bus, bool full);
   void writePlane(EpdBus& bus, const uint8_t* fb);
 
-  static constexpr uint8_t kPartialsBeforeFull = 5;  // stock firmware's partial budget
-  uint8_t _partialsRemaining = 0;                    // 0 forces a full refresh next
+  static constexpr uint8_t kMaxPartialsInRow = 30;  // safety cap; the stock firmware's own budget is 5
+  uint8_t _partialsRemaining = 0;                   // 0 forces a full refresh next
   bool _isScreenOn = false;
 };
 

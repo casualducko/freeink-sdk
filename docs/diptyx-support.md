@@ -45,7 +45,8 @@ hold and drive it low, as stock `Device::shutdown()` does) is not wired in.
 `DiptyxDriver` replays the stock sequence: reset, POWER SETTING (0x01) / VCOM 0x82 / BTST 0x06 / PLL 0x30 / 0x52 /
 PWS 0xE3 / 0x41, POWER ON, PSR 0x3F,0x09 (register-LUT mode), TRES 648x480, 0x15, CDI 0x18,0x07, TCON 0x22, then the five
 42-byte LUT registers (full or partial), new-frame data (0x13), refresh (0x12), POWER OFF. It does this before every
-refresh. This differs from `Uc8179Driver`, which uses the OTP waveforms. VCOM is the stock default 23; the stock firmware keeps a
+refresh. FULL and HALF requests use the full LUT, FAST uses the partial LUT, and the host schedules the full refreshes
+(a safety cap forces one after 30 partials; stock used 5). This differs from `Uc8179Driver`, which uses the OTP waveforms. VCOM is the stock default 23; the stock firmware keeps a
 per-unit value in NVS that is not read here.
 
 Verified on hardware: a 1 bit in the data plane is BLACK (framebuffer is inverted on output), and the left panel is

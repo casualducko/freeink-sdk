@@ -137,9 +137,9 @@ void DiptyxDriver::begin(EpdBus& bus) {
 
 void DiptyxDriver::display(EpdBus& bus, const uint8_t* fb, const uint8_t* prev, RefreshMode mode, bool turnOff) {
   (void)prev;
-  bool full = (mode == RefreshMode::Full) || _partialsRemaining == 0;
+  const bool full = (mode != RefreshMode::Fast) || _partialsRemaining == 0;
   if (full) {
-    _partialsRemaining = kPartialsBeforeFull;
+    _partialsRemaining = kMaxPartialsInRow;
   } else {
     _partialsRemaining--;
   }
