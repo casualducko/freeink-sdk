@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <BoardConfig.h>
+#include <driver/gpio.h>
 #include <M5Pm1.h>
 #include <esp_idf_version.h>
 #if ESP_IDF_VERSION_MAJOR < 5
@@ -480,6 +481,50 @@ BatteryMonitor::Status BatteryMonitor::readStatus() const {
   return status;
 }
 
+#if FREEINK_DEVICE_DIPTYX
+namespace {
+// Diptyx: the battery divider is only connected while GPIO43 is HIGH (stock Device::getBatteryVoltage()).
+// The gate idles LOW with a pad hold so the divider does not drain the cell, including in deep sleep.
+constexpr int8_t DIPTYX_BATTERY_SENSE_GATE = 43;
+constexpr int DIPTYX_ADC_SAMPLES = 16;
+
+// Returns millivolts at the cell (divider applied), or 0 when no valid sample was read. The pin is ADC2,
+// which the Wi-Fi driver owns while it is running, so reads can fail; the caller keeps the last good value.
+uint16_t readDiptyxBatteryMillivolts(int8_t adcPin, float dividerMultiplier) {
+  static uint16_t lastGoodMv = 0;
+  const auto gate = static_cast<gpio_num_t>(DIPTYX_BATTERY_SENSE_GATE);
+  gpio_hold_dis(gate);
+  pinMode(DIPTYX_BATTERY_SENSE_GATE, OUTPUT);
+  digitalWrite(DIPTYX_BATTERY_SENSE_GATE, HIGH);
+  delay(20);  // let the divider settle
+  uint32_t sum = 0;
+  int valid = 0;
+  for (int i = 0; i < DIPTYX_ADC_SAMPLES; i++) {
+    const uint32_t mv = analogReadMilliVolts(adcPin);
+    if (mv > 0) {
+      sum += mv;
+      valid++;
+    }
+  }
+  digitalWrite(DIPTYX_BATTERY_SENSE_GATE, LOW);
+  gpio_hold_en(gate);
+  if (valid >= DIPTYX_ADC_SAMPLES / 2) {
+    lastGoodMv = static_cast<uint16_t>((sum / valid) * dividerMultiplier);
+  }
+  // Diagnostic (serial log): lets the percentage be checked against a real voltage. Only prints when it moves.
+  static uint16_t lastLoggedMv = 0;
+  const int diff = static_cast<int>(lastGoodMv) - static_cast<int>(lastLoggedMv);
+  if (Serial && (diff >= 10 || diff <= -10 || valid < DIPTYX_ADC_SAMPLES / 2)) {
+    Serial.printf("[%lu] [BAT] %u mV at cell (pin avg %lu mV x%.1f, %d/%d samples valid)\n", millis(), lastGoodMv,
+                  valid ? static_cast<unsigned long>(sum / valid) : 0UL, static_cast<double>(dividerMultiplier), valid,
+                  DIPTYX_ADC_SAMPLES);
+    lastLoggedMv = lastGoodMv;
+  }
+  return lastGoodMv;
+}
+}  // namespace
+#endif
+
 uint16_t BatteryMonitor::readMillivolts() const {
 #if FREEINK_BATTERY_I2C_GAUGE
   if (BoardConfig::ACTIVE.batteryGauge.gaugeAddr != 0) {
@@ -494,6 +539,9 @@ uint16_t BatteryMonitor::readMillivolts() const {
     return 0;
   }
   if (!hasAdcBackend()) return 0;
+#if FREEINK_DEVICE_DIPTYX
+  if (BoardConfig::isDiptyx()) return readDiptyxBatteryMillivolts(_adcPin, _dividerMultiplier);
+#endif
 #if ESP_IDF_VERSION_MAJOR < 5
   // ESP-IDF 4.x doesn't have analogReadMilliVolts, so calibrate manually.
   const uint16_t raw = analogRead(_adcPin);
