@@ -30,6 +30,7 @@
 #include "driver/Uc8279Driver.h"
 #endif
 #if FREEINK_DRIVER_UC8179
+#include "driver/DiptyxDriver.h"
 #include "driver/Uc8179Driver.h"
 #endif
 #if FREEINK_DRIVER_UC8279_X4
@@ -145,6 +146,10 @@ void FreeInkDisplay::selectDriver() {
 #endif
     case PanelSel::X4:
     default:
+#if FREEINK_DRIVER_DIPTYX
+      _driver = &diptyxDriver();
+      break;
+#endif
 #if FREEINK_DRIVER_UC8179
       // Newer X4 / X4 Pro batches swap the SSD1677 for an UltraChip part.
       // Which silicon a unit carries is decided before begin() by the boot-time

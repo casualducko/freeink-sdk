@@ -78,6 +78,9 @@
 #ifndef FREEINK_DEVICE_WS397
 #define FREEINK_DEVICE_WS397 0
 #endif
+#ifndef FREEINK_DEVICE_DIPTYX
+#define FREEINK_DEVICE_DIPTYX 0
+#endif
 
 #ifndef FREEINK_DEVICE_METALIO_EINK4
 #define FREEINK_DEVICE_METALIO_EINK4 0
@@ -90,9 +93,10 @@
 #if !(FREEINK_DEVICE_X4 || FREEINK_DEVICE_X3 || FREEINK_DEVICE_X4PRO || FREEINK_DEVICE_X4CLASSIC || FREEINK_DEVICE_M5 || \
       FREEINK_DEVICE_MURPHY || FREEINK_DEVICE_DELINK || FREEINK_DEVICE_LILYGO || FREEINK_DEVICE_M5PAPER ||               \
       FREEINK_DEVICE_STICKY || FREEINK_DEVICE_PAPERMONO || FREEINK_DEVICE_PAPERS3 || FREEINK_DEVICE_MURPHY_M4 ||         \
-      FREEINK_DEVICE_EEGO_A4 || FREEINK_DEVICE_ONEPAGE || FREEINK_DEVICE_WS397 || FREEINK_DEVICE_METALIO_EINK4)
+      FREEINK_DEVICE_EEGO_A4 || FREEINK_DEVICE_ONEPAGE || FREEINK_DEVICE_WS397 || FREEINK_DEVICE_METALIO_EINK4 || \
+      FREEINK_DEVICE_DIPTYX)
 #error \
-    "FreeInk: no device selected. Pass at least one -DFREEINK_DEVICE_<NAME> (X4, X3, X4PRO, X4CLASSIC, M5, MURPHY, DELINK, LILYGO, M5PAPER, STICKY, PAPERMONO, PAPERS3, MURPHY_M4, EEGO_A4, ONEPAGE, WS397, METALIO_EINK4) in your build env — see platformio.sample.ini."
+    "FreeInk: no device selected. Pass at least one -DFREEINK_DEVICE_<NAME> (X4, X3, X4PRO, X4CLASSIC, M5, MURPHY, DELINK, LILYGO, M5PAPER, STICKY, PAPERMONO, PAPERS3, MURPHY_M4, EEGO_A4, ONEPAGE, WS397, METALIO_EINK4, DIPTYX) in your build env — see platformio.sample.ini."
 #endif
 // Each device belongs to one MCU family; a binary targets exactly one. X3/X4 are
 // ESP32-C3; M5 PaperColor/Murphy/de-link/LilyGo are ESP32-S3; M5Paper v1.1 is the
@@ -103,7 +107,7 @@
 #define FREEINK_MCU_S3                                                                                    \
   (FREEINK_DEVICE_M5 || FREEINK_DEVICE_MURPHY || FREEINK_DEVICE_DELINK || FREEINK_DEVICE_LILYGO ||        \
    FREEINK_DEVICE_STICKY || FREEINK_DEVICE_X4PRO || FREEINK_DEVICE_X4CLASSIC || FREEINK_DEVICE_PAPERMONO ||  \
-   FREEINK_DEVICE_PAPERS3 || FREEINK_DEVICE_MURPHY_M4 || FREEINK_DEVICE_EEGO_A4 || FREEINK_DEVICE_WS397 || FREEINK_DEVICE_METALIO_EINK4)
+   FREEINK_DEVICE_PAPERS3 || FREEINK_DEVICE_MURPHY_M4 || FREEINK_DEVICE_EEGO_A4 || FREEINK_DEVICE_WS397 || FREEINK_DEVICE_METALIO_EINK4 || FREEINK_DEVICE_DIPTYX)
 #define FREEINK_MCU_ESP32 (FREEINK_DEVICE_M5PAPER)
 #if (FREEINK_MCU_C3 + FREEINK_MCU_C61 + FREEINK_MCU_S3 + FREEINK_MCU_ESP32) != 1
 #error \
@@ -170,6 +174,12 @@
 #define FREEINK_DRIVER_UC8253_MURPHY 1
 #else
 #define FREEINK_DRIVER_UC8253_MURPHY 0
+#endif
+// Diptyx dual-screen reader: UC8179-class 648x480 panels with register LUTs (DiptyxDriver).
+#if FREEINK_DEVICE_DIPTYX
+#define FREEINK_DRIVER_DIPTYX 1
+#else
+#define FREEINK_DRIVER_DIPTYX 0
 #endif
 // LilyGo T5 S3 and M5Stack PaperS3: raw-parallel ED047TC1 via LovyanGFX (M5GFX).
 // External-bus driver; each board injects its own bus pins/power in an
@@ -353,7 +363,7 @@
 #ifndef FREEINK_SD_SDMMC
 #define FREEINK_SD_SDMMC                                                                            \
   (FREEINK_DEVICE_DELINK || FREEINK_DEVICE_X4PRO || FREEINK_DEVICE_X4CLASSIC || FREEINK_DEVICE_PAPERMONO || \
-   FREEINK_DEVICE_MURPHY_M4 || FREEINK_DEVICE_WS397 || FREEINK_DEVICE_METALIO_EINK4)
+   FREEINK_DEVICE_MURPHY_M4 || FREEINK_DEVICE_WS397 || FREEINK_DEVICE_METALIO_EINK4 || FREEINK_DEVICE_DIPTYX)
 #endif
 
 // Serial log transport hint for consumer firmware. Boards can share the same MCU
@@ -412,6 +422,7 @@ enum class Board : uint8_t {
   OnePage,    // OnePage: ESP32-C61, SSD1677 800x480 SPI panel, 4-key ADC ladder + 3 side keys
   WsEpaper397,  // Waveshare ESP32-S3-ePaper-3.97: SSD1677 800x480, 3 keys + BOOT, AXP2101 PMIC
   MetalioEInk4,  // ESP32-S3, GDEM0397T81, CST816S, TCA9555
+  Diptyx,        // Diptyx dual-screen reader: ESP32-S3, 2x UC8179-class 648x480 panels (left only so far), 7 keys
 };
 
 // How the board reports button presses.
@@ -1870,6 +1881,47 @@ constexpr BoardProfile ONEPAGE = {
     {0, 0, 0, 0},    // viewableInsets: full 800x480 panel frame
     false};          // batteryChargeStatusActiveHigh: false (low = USB present)
 
+// --- Diptyx dual-screen e-reader — ESP32-S3, 2 x 648x480 UC8179-class B/W panels ---
+// Pins and init recovered from the stock firmware (github.com/MartijndenHoed/Diptyx,
+// MIT) and verified on hardware with a test app (docs/diptyx-support.md).
+// Only the LEFT panel is driven so far; both panels share SCLK 11 / MOSI 12, each has
+// its own CS/DC/RST/BUSY (right: CS 21 DC 18 RST 17 BUSY 14). The DiptyxDriver
+// uploads the stock register LUTs (the OTP waveforms are not used) and inverts the
+// framebuffer (1 = black on this panel/CDI setting).
+// SD is SDMMC 1-bit: CLK 41 CMD 40 D0 39. Buttons are active-low with pull-ups, tested on
+// hardware: page-left 5, arrow-left 1, joystick press 0 (boot pin), up 2, down 3,
+// arrow-right 4 (unmapped), page-right 6. Power latch GPIO38 must be driven HIGH early.
+// Battery sense (ADC2 ch2 = GPIO13, x2 divider, gated by GPIO43 high) and USB detect
+// (GPIO15, polarity unverified) are not wired into the SDK yet.
+constexpr BoardProfile DIPTYX = {
+    Board::Diptyx,
+    "diptyx",
+    InputStyle::DigitalButtons,
+    DisplayController::UC8179,
+    648,
+    480,
+    {11, 12, 10, 9, 8, 7, PIN_UNASSIGNED},  // SCLK MOSI CS DC RST BUSY (left panel)
+    7000000,                                // displaySpiHz: stock 7 MHz
+    {PIN_UNASSIGNED, PIN_UNASSIGNED, PIN_UNASSIGNED, PIN_UNASSIGNED, PIN_UNASSIGNED, false, 0},
+    // back=arrow-left(1), confirm=joystick press(0), left=page-left(5), right=page-right(6),
+    // up=2, down=3, no dedicated power key.
+    {1, 0, 5, 6, 2, 3, PIN_UNASSIGNED, false},
+    PIN_UNASSIGNED,  // batteryAdc: GPIO13 behind a GPIO43 gate, not supported yet
+    PIN_UNASSIGNED,  // batteryChargeStatus
+    2.0f,
+    PIN_UNASSIGNED,  // usbDetect: GPIO15 polarity unverified
+    NO_TOUCH,
+    NO_FRONTLIGHT,
+    NO_AUDIO,
+    NO_LEDS,
+    NO_FLIP,
+    {41, 40, 39, PIN_UNASSIGNED, PIN_UNASSIGNED, PIN_UNASSIGNED, 1},  // SDMMC 1-bit: CLK41 CMD40 D0=39
+    NO_GAUGE,
+    NO_MIC,
+    NO_SENSORS,
+    1.0f,  // uiScale
+    {38, PIN_UNASSIGNED, PIN_UNASSIGNED, false}};  // power latch GPIO38
+
 static_assert(ONEPAGE.displayWidth / 8 * ONEPAGE.displayHeight == 48000,
               "OnePage framebuffer must be 48,000 bytes (800/8 x 480)");
 
@@ -1883,6 +1935,8 @@ constexpr uint32_t panelBytes(const BoardProfile& p) {
   return static_cast<uint32_t>(p.displayWidth / 8) * p.displayHeight;
 }
 constexpr uint32_t MAX_FRAMEBUFFER_BYTES = cmax(
+    FREEINK_DEVICE_DIPTYX ? panelBytes(DIPTYX) : 0u,
+    cmax(
     cmax(cmax(FREEINK_DEVICE_X4 ? panelBytes(XTEINK_X4) : 0u, FREEINK_DEVICE_X3 ? panelBytes(XTEINK_X3) : 0u),
          cmax(FREEINK_DEVICE_M5 ? panelBytes(M5STACK_PAPER_COLOR) : 0u,
               FREEINK_DEVICE_MURPHY ? panelBytes(MURPHY_M3) : 0u)),
@@ -1898,12 +1952,14 @@ constexpr uint32_t MAX_FRAMEBUFFER_BYTES = cmax(
                    cmax(cmax(FREEINK_DEVICE_EEGO_A4 ? panelBytes(EEGO_A4) : 0u,
                              FREEINK_DEVICE_ONEPAGE ? panelBytes(ONEPAGE) : 0u),
                         cmax(FREEINK_DEVICE_WS397 ? panelBytes(WS_EPAPER_397) : 0u,
-                             FREEINK_DEVICE_METALIO_EINK4 ? panelBytes(METALIO_EINK4) : 0u))))));
+                             FREEINK_DEVICE_METALIO_EINK4 ? panelBytes(METALIO_EINK4) : 0u)))))));
 
 // Compile-time default device — the profile ACTIVE starts as. With a single
 // device in the build this is the only device; with several same-MCU devices it
 // is the boot default until the consumer calls selectDevice().
-#if FREEINK_DEVICE_METALIO_EINK4
+#if FREEINK_DEVICE_DIPTYX
+constexpr BoardProfile DEFAULT_DEVICE = DIPTYX;
+#elif FREEINK_DEVICE_METALIO_EINK4
 constexpr BoardProfile DEFAULT_DEVICE = METALIO_EINK4;
 #elif FREEINK_DEVICE_WS397
 constexpr BoardProfile DEFAULT_DEVICE = WS_EPAPER_397;
@@ -2035,6 +2091,11 @@ inline bool selectDevice(Board which) {
       ACTIVE = METALIO_EINK4;
       break;
 #endif
+#if FREEINK_DEVICE_DIPTYX
+    case Board::Diptyx:
+      ACTIVE = DIPTYX;
+      break;
+#endif
 #if FREEINK_DEVICE_WS397
     case Board::WsEpaper397:
       ACTIVE = WS_EPAPER_397;
@@ -2063,6 +2124,7 @@ inline bool isPaperMono() { return ACTIVE.board == Board::PaperMono; }
 inline bool isEegoA4() { return ACTIVE.board == Board::EegoA4; }
 inline bool isMetalioEInk4() { return ACTIVE.board == Board::MetalioEInk4; }
 inline bool isOnePage() { return ACTIVE.board == Board::OnePage; }
+inline bool isDiptyx() { return ACTIVE.board == Board::Diptyx; }
 inline bool isWsEpaper397() { return ACTIVE.board == Board::WsEpaper397; }
 inline bool hasTouch() { return ACTIVE.touch.controller != TouchController::None; }
 inline bool hasHomeKey() { return ACTIVE.touch.hasHomeKey; }
