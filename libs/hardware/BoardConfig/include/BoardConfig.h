@@ -1891,8 +1891,8 @@ constexpr BoardProfile ONEPAGE = {
 // SD is SDMMC 1-bit: CLK 41 CMD 40 D0 39. Buttons are active-low with pull-ups, tested on
 // hardware: page-left 5, arrow-left 1, joystick press 0 (boot pin), up 2, down 3,
 // arrow-right 4 (unmapped), page-right 6. Power latch GPIO38 must be driven HIGH early.
-// Battery sense (ADC2 ch2 = GPIO13, x2 divider, gated by GPIO43 high) and USB detect
-// (GPIO15, polarity unverified) are not wired into the SDK yet.
+// Battery sense (ADC2 ch2 = GPIO13, x2 divider, gated by GPIO43 high) is not wired into the SDK yet.
+// Stock firmware pin roles: GPIO16 = USB VBUS detect, GPIO42 = power button (active-high), GPIO15 = USB wake trigger.
 constexpr BoardProfile DIPTYX = {
     Board::Diptyx,
     "diptyx",
@@ -1904,12 +1904,13 @@ constexpr BoardProfile DIPTYX = {
     7000000,                                // displaySpiHz: stock 7 MHz
     {PIN_UNASSIGNED, PIN_UNASSIGNED, PIN_UNASSIGNED, PIN_UNASSIGNED, PIN_UNASSIGNED, false, 0},
     // back=arrow-left(1), confirm=joystick press(0), left=page-left(5), right=page-right(6),
-    // up=2, down=3, no dedicated power key.
-    {1, 0, 5, 6, 2, 3, PIN_UNASSIGNED, false},
+    // up=2, down=3, power=GPIO42 (the physical power button, active-HIGH, from the stock firmware;
+    // RTC-incapable, so it cannot wake deep sleep — the seven buttons do, see PowerManager).
+    {1, 0, 5, 6, 2, 3, 42, true},
     PIN_UNASSIGNED,  // batteryAdc: GPIO13 behind a GPIO43 gate, not supported yet
     PIN_UNASSIGNED,  // batteryChargeStatus
     2.0f,
-    PIN_UNASSIGNED,  // usbDetect: GPIO15 polarity unverified
+    16,              // usbDetect: VBUS sense, HIGH when USB is present (stock vbus_monitor_io)
     NO_TOUCH,
     NO_FRONTLIGHT,
     NO_AUDIO,

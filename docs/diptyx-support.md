@@ -19,10 +19,18 @@ with a test app.
 | SD (SDMMC 1-bit, internal pull-ups) | CLK 41, CMD 40, D0 39 |
 | Buttons (active-low, pull-ups), tested | page-left 5, arrow-left 1, joystick press 0 (boot pin), up 2, down 3, arrow-right 4, page-right 6 |
 | Power latch | GPIO38 HIGH early in boot (stock also gpio_hold_en) |
-| Other | status LED 48, rumble 47, USB power trigger 15, battery sense gate 43 (HIGH to sample), battery ADC = ADC2 ch2 = GPIO13 with a 2x divider |
+| Power button / USB | power button GPIO42 (active-HIGH, pulldown), USB VBUS detect GPIO16 (HIGH = USB present, also TinyUSB `vbus_monitor_io`), USB wake trigger GPIO15 (inverted, unused here). Roles derived from stock `main.cpp`: hold 42 for 3 s with 16 low shuts down; 16+!15 = USB booted |
+| Other | status LED 48, rumble 47, battery sense gate 43 (HIGH to sample), battery ADC = ADC2 ch2 = GPIO13 with a 2x divider |
 
 Button mapping in the profile: back = arrow-left (1), confirm = joystick press (0), left/right = page-left/right (5/6),
-up/down = 2/3. Arrow-right (4) and a power key are unmapped.
+up/down = 2/3, power = 42 (active-high), USB detect = 16. Arrow-right (4) is unmapped.
+
+## Sleep
+
+Like stock, "sleep" is deep sleep with the GPIO38 latch held (the board stays powered). `PowerManager` wakes it from any of the seven
+buttons (EXT1 any-low, RTC pull-ups, GPIO 0-6 are all RTC pins) and waits up to 5 s for a held button to be released first. The power
+button (GPIO42) is not an RTC pin and cannot wake deep sleep; USB (GPIO15) is not a wake source yet. A hard power-off (release the GPIO38
+hold and drive it low, as stock `Device::shutdown()` does) is not wired in.
 
 ## Panel
 
@@ -38,5 +46,4 @@ portrait orientation handles the 90 degree rotation.
 
 ## Not done
 
-Right panel; battery gauge (GPIO13 behind the GPIO43 gate); USB detect (GPIO15, polarity unverified); deep-sleep wake;
-LED/rumble; grayscale (B/W only); VCOM from NVS.
+Right panel; battery gauge (GPIO13 behind the GPIO43 gate); hard power-off; USB wake; LED/rumble; grayscale (B/W only); VCOM from NVS.
