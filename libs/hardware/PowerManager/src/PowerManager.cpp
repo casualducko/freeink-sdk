@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <BoardConfig.h>
 #include <driver/gpio.h>
+#include <driver/rtc_io.h>
 #include <esp_sleep.h>
 #include <esp_system.h>
 #include <soc/soc_caps.h>
@@ -11,6 +12,42 @@
 #endif
 
 namespace freeink {
+#if FREEINK_DEVICE_DIPTYX
+namespace {
+// Diptyx has no dedicated power key: the stock firmware sleeps with the GPIO38 latch held (the board stays
+// powered) and wakes on ANY of the seven buttons via EXT1, using RTC pull-ups. All are RTC-capable (<= 21).
+// Order: page-left, arrow-left, joystick press (boot pin), up, down, arrow-right, page-right.
+// The USB trigger (GPIO15) is deliberately not a wake source yet: its polarity is unverified, and an
+// already-low pin would wake the device straight back up.
+constexpr int8_t DIPTYX_WAKE_PINS[] = {5, 1, 0, 2, 3, 4, 6};
+
+uint64_t diptyxWakeMask() {
+  uint64_t mask = 0;
+  for (const int8_t pin : DIPTYX_WAKE_PINS) mask |= 1ULL << pin;
+  return mask;
+}
+
+bool diptyxAnyButtonPressed() {
+  for (const int8_t pin : DIPTYX_WAKE_PINS) {
+    if (digitalRead(pin) == LOW) return true;
+  }
+  return false;
+}
+
+// Release the digital pad state and give each button an RTC pull-up so the idle level survives deep sleep.
+void diptyxConfigureWakeButtons() {
+  for (const int8_t pin : DIPTYX_WAKE_PINS) {
+    const auto g = static_cast<gpio_num_t>(pin);
+    gpio_hold_dis(g);
+    rtc_gpio_init(g);
+    rtc_gpio_set_direction(g, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_en(g);
+    rtc_gpio_pulldown_dis(g);
+  }
+}
+}  // namespace
+#endif
+
 namespace {
 int8_t powerPin() { return BoardConfig::ACTIVE.input.power; }
 bool powerActiveHigh() { return BoardConfig::ACTIVE.input.powerActiveHigh; }
@@ -54,6 +91,13 @@ void PowerManager::armWakeOnPins(uint64_t gpioMask, bool wakeLow) {
 }
 
 bool PowerManager::armPowerButtonWakeup() {
+#if FREEINK_DEVICE_DIPTYX
+  if (BoardConfig::isDiptyx()) {
+    diptyxConfigureWakeButtons();
+    armWakeOnPins(diptyxWakeMask(), /*wakeLow=*/true);
+    return true;
+  }
+#endif
   const int8_t pin = powerPin();
   if (pin < 0) return false;
   const bool activeHigh = powerActiveHigh();
@@ -65,6 +109,15 @@ bool PowerManager::armPowerButtonWakeup() {
 }
 
 void PowerManager::waitForPowerButtonRelease() {
+#if FREEINK_DEVICE_DIPTYX
+  if (BoardConfig::isDiptyx()) {
+    // A held button would wake the device immediately. Wait for release, but never hang: sleep anyway after 5 s.
+    for (const int8_t pin : DIPTYX_WAKE_PINS) pinMode(pin, INPUT_PULLUP);
+    const unsigned long start = millis();
+    while (diptyxAnyButtonPressed() && millis() - start < 5000) delay(20);
+    return;
+  }
+#endif
   const int8_t pin = powerPin();
   if (pin < 0) return;
   const bool activeHigh = powerActiveHigh();
