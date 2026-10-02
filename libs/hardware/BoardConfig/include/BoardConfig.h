@@ -1903,10 +1903,12 @@ constexpr BoardProfile DIPTYX = {
     {11, 12, 10, 9, 8, 7, PIN_UNASSIGNED},  // SCLK MOSI CS DC RST BUSY (left panel)
     7000000,                                // displaySpiHz: stock 7 MHz
     {PIN_UNASSIGNED, PIN_UNASSIGNED, PIN_UNASSIGNED, PIN_UNASSIGNED, PIN_UNASSIGNED, false, 0},
-    // back=arrow-left(1), confirm=joystick press(0), left=page-left(5), right=page-right(6),
-    // up=2, down=3, power=GPIO42 (the physical power button, active-HIGH, from the stock firmware;
-    // RTC-incapable, so it cannot wake deep sleep — the seven buttons do, see PowerManager).
-    {1, 0, 5, 6, 2, 3, 42, true},
+    // Layout (user-chosen): back=page-left(5), confirm=joystick press(0), right=page-right(6) = Next/Down,
+    // left=joystick-left(1) = Prev/Up (no bottom hint), up/down = joystick up/down (2/3),
+    // power=GPIO42 (the physical power button, active-HIGH, from the stock firmware; not an RTC pin, so
+    // it cannot wake deep sleep — the seven buttons do, see PowerManager). Joystick-right (4) is unmapped.
+    // The bottom hint bar draws three hints over the three bottom buttons (see the themes).
+    {5, 0, 1, 6, 2, 3, 42, true},
     13,              // batteryAdc: ADC2 ch2 behind a divider gated by GPIO43 HIGH (BatteryMonitor drives the gate)
     PIN_UNASSIGNED,  // batteryChargeStatus
     2.0f,
