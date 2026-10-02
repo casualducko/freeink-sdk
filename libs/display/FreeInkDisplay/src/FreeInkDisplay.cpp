@@ -32,6 +32,9 @@
 #if FREEINK_DRIVER_UC8179
 #include "driver/Uc8179Driver.h"
 #endif
+#if FREEINK_DRIVER_DIPTYX
+#include "driver/DiptyxDriver.h"
+#endif
 #if FREEINK_DRIVER_UC8279_X4
 #include "driver/Uc8279X4Driver.h"
 #endif
@@ -145,6 +148,10 @@ void FreeInkDisplay::selectDriver() {
 #endif
     case PanelSel::X4:
     default:
+#if FREEINK_DRIVER_DIPTYX
+      _driver = &diptyxDriver();
+      break;
+#endif
 #if FREEINK_DRIVER_UC8179
       // Newer X4 / X4 Pro batches swap the SSD1677 for an UltraChip part.
       // Which silicon a unit carries is decided before begin() by the boot-time
@@ -1033,9 +1040,35 @@ void FreeInkDisplay::setCustomLUT(bool enabled, const unsigned char* lutData) {
   if (_driver) _driver->setCustomLut(_bus, enabled, lutData);
 }
 
+void FreeInkDisplay::selectPanel(PanelSide side) {
+#if FREEINK_DRIVER_DIPTYX
+  if (!_driver || side == _panelSide) return;
+  cancelGrayscalePass();
+  syncPendingAsync();
+  const auto s = side == PanelSide::Right ? DiptyxDriver::Side::Right : DiptyxDriver::Side::Left;
+  _panelSide = side;
+  _driver = &diptyxDriver(s);
+  // Re-point the shared bus at the other panel's CS/DC/RST/BUSY.
+  _bus.begin(DiptyxDriver::pins(s), _driver->spiHz(), _driver->busyPolarity(), _driver->spiMiso(), _driver->coCs());
+  if (side == PanelSide::Right && !_rightPanelStarted) {
+    _driver->begin(_bus);
+    _rightPanelStarted = true;
+  }
+#else
+  (void)side;
+#endif
+}
+
 void FreeInkDisplay::deepSleep() {
   cancelGrayscalePass();
   syncPendingAsync();
+#if FREEINK_DRIVER_DIPTYX
+  if (_rightPanelStarted) {  // put the right panel to sleep too, then finish with the left
+    selectPanel(PanelSide::Right);
+    _driver->deepSleep(_bus);
+  }
+  selectPanel(PanelSide::Left);
+#endif
   if (_driver) _driver->deepSleep(_bus);
 }
 

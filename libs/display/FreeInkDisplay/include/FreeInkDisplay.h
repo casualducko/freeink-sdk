@@ -107,6 +107,12 @@ class FreeInkDisplay {
   // refresh after a mode change is automatically promoted from FAST to HALF
   // so single-buffer differential panels cannot compare opposite polarities.
   void setInverted(bool inverted);
+
+  // Dual-panel boards (Diptyx): choose which physical panel the next display call drives. The framebuffer is shared,
+  // so render, refresh, then switch. No-op on single-panel boards. The right panel is brought up on first use.
+  enum class PanelSide : uint8_t { Left, Right };
+  void selectPanel(PanelSide side);
+  PanelSide activePanel() const { return _panelSide; }
   bool toggleInverted();
   bool isInverted() const { return _inverted; }
 #ifndef EINK_DISPLAY_SINGLE_BUFFER_MODE
@@ -416,6 +422,8 @@ class FreeInkDisplay {
 
   EpdBus _bus;
   PanelDriver* _driver = nullptr;
+  PanelSide _panelSide = PanelSide::Left;
+  bool _rightPanelStarted = false;
 
   // Async refresh state: pending flag + (single-buffer mode) a lazily
   // allocated shadow of the last-displayed frame, used as the differential
