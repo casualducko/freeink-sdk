@@ -17,13 +17,13 @@ with a test app.
 | Left panel | CS 10, DC 9, RST 8, BUSY 7 (BUSY high = idle) |
 | Right panel (not driven yet) | CS 21, DC 18, RST 17, BUSY 14. CS 21 is held high via `DiptyxDriver::coCs()` |
 | SD (SDMMC 1-bit, internal pull-ups) | CLK 41, CMD 40, D0 39 |
-| Buttons (active-low, pull-ups), tested | page-left 5, arrow-left 1, joystick press 0 (boot pin), up 2, down 3, arrow-right 4, page-right 6 |
+| Buttons (active-low, pull-ups), tested | page-left 5, joystick press 0 (boot pin), up 2, down 3, page-right 6. The stock source also names arrow-left 1 and arrow-right 4; no physical control reached them on the tested unit (the centre control is a rocker, not a 5-way joystick) |
 | Power latch | GPIO38 HIGH early in boot (stock also gpio_hold_en) |
 | Power button / USB | power button GPIO42 (active-HIGH, pulldown), USB VBUS detect GPIO16 (HIGH = USB present, also TinyUSB `vbus_monitor_io`), USB wake trigger GPIO15 (inverted, unused here). Roles derived from stock `main.cpp`: hold 42 for 3 s with 16 low shuts down; 16+!15 = USB booted |
 | Other | status LED 48, rumble 47, battery sense gate 43 (HIGH to sample), battery ADC = ADC2 ch2 = GPIO13 with a 2x divider |
 
 Button mapping in the profile: back = page-left (5), confirm = joystick press (0), right/Next = page-right (6),
-left/Prev = joystick-left (1), up/down = joystick up/down (2/3), power = 42 (active-high), USB detect = 16. Joystick-right (4) is
+left/Prev = GPIO 1 (not connected on the tested unit, harmless), up/down = joystick up/down (2/3), power = 42 (active-high), USB detect = 16. GPIO 4 is
 unmapped. The bottom hint bar shows three hints (Back / Select / Next) over the three bottom buttons; the Prev hint is dropped.
 
 ## Battery
