@@ -422,7 +422,7 @@ enum class Board : uint8_t {
   OnePage,    // OnePage: ESP32-C61, SSD1677 800x480 SPI panel, 4-key ADC ladder + 3 side keys
   WsEpaper397,  // Waveshare ESP32-S3-ePaper-3.97: SSD1677 800x480, 3 keys + BOOT, AXP2101 PMIC
   MetalioEInk4,  // ESP32-S3, GDEM0397T81, CST816S, TCA9555
-  Diptyx,        // Diptyx dual-screen reader: ESP32-S3, 2x UC8179-class 648x480 panels (left only so far), 7 keys
+  Diptyx,        // Diptyx dual-screen reader: ESP32-S3, 2x UC8179-class 648x480 panels (left default, right via selectPanel), 5 physical controls
 };
 
 // How the board reports button presses.
@@ -1884,7 +1884,7 @@ constexpr BoardProfile ONEPAGE = {
 // --- Diptyx dual-screen e-reader — ESP32-S3, 2 x 648x480 UC8179-class B/W panels ---
 // Pins and init recovered from the stock firmware (github.com/MartijndenHoed/Diptyx,
 // MIT) and verified on hardware with a test app (docs/diptyx-support.md).
-// Only the LEFT panel is driven so far; both panels share SCLK 11 / MOSI 12, each has
+// Both panels are driven (FreeInkDisplay::selectPanel picks one); they share SCLK 11 / MOSI 12, each has
 // its own CS/DC/RST/BUSY (right: CS 21 DC 18 RST 17 BUSY 14). The DiptyxDriver
 // uploads the stock register LUTs (the OTP waveforms are not used) and inverts the
 // framebuffer (1 = black on this panel/CDI setting).
@@ -1906,7 +1906,7 @@ constexpr BoardProfile DIPTYX = {
     // Layout (user-chosen): back=page-left(5), confirm=center button press(0), right=page-right(6) = Next/Down,
     // left=GPIO1 (not connected on the tested unit; no bottom hint), up/down = center button up/down (2/3),
     // power=GPIO42 (the physical power button, active-HIGH, from the stock firmware; not an RTC pin, so
-    // it cannot wake deep sleep — the seven buttons do, see PowerManager). Center-button right (4) is unmapped.
+    // it cannot wake deep sleep — the GPIO 0-6 inputs do, see PowerManager). Center-button right (4) is unmapped.
     // The bottom hint bar draws three hints over the three bottom buttons (see the themes).
     {5, 0, 1, 6, 2, 3, 42, true},
     13,              // batteryAdc: ADC2 ch2 behind a divider gated by GPIO43 HIGH (BatteryMonitor drives the gate)

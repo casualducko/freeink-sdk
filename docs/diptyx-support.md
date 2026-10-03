@@ -1,9 +1,9 @@
 # Diptyx dual-screen e-reader support
 
-`-DFREEINK_DEVICE_DIPTYX=1` (`Board::Diptyx`, profile name `diptyx`). **Left panel only** so far.
+`-DFREEINK_DEVICE_DIPTYX=1` (`Board::Diptyx`, profile name `diptyx`). Both panels are driven: `FreeInkDisplay::selectPanel(PanelSide::Left/Right)` picks which one the next refresh goes to (default Left, reset by `begin()`).
 
 ESP32-S3 (16 MB quad flash, 8 MB octal PSRAM), two 648x480 B/W e-paper panels (Waveshare 5.83" B V2
-class, UC8179-family command set), SDMMC 1-bit SD, seven buttons. Hardware: <https://diptyx.dev>.
+class, UC8179-family command set), SDMMC 1-bit SD, five physical controls (two side buttons and a center button that presses and rocks up/down). Hardware: <https://diptyx.dev>.
 Stock firmware (MIT): <https://github.com/MartijndenHoed/Diptyx>.
 
 ## Pin evidence
@@ -15,7 +15,7 @@ with a test app.
 |---|---|
 | EPD SPI (shared by both panels) | SCLK 11, MOSI 12, no MISO, mode 0, 7 MHz |
 | Left panel | CS 10, DC 9, RST 8, BUSY 7 (BUSY high = idle) |
-| Right panel (not driven yet) | CS 21, DC 18, RST 17, BUSY 14. CS 21 is held high via `DiptyxDriver::coCs()` |
+| Right panel | CS 21, DC 18, RST 17, BUSY 14. Each panel keeps the other's CS high via `DiptyxDriver::coCs()`. The left panel is flipped 180 degrees on output; the right is sent as is |
 | SD (SDMMC 1-bit, internal pull-ups) | CLK 41, CMD 40, D0 39 |
 | Buttons (active-low, pull-ups), tested | page-left 5, center button press 0 (boot pin), up 2, down 3, page-right 6. The stock source also names arrow-left 1 and arrow-right 4; no physical control reached them on the tested unit (the center control is a rocker, not a 5-way joystick) |
 | Power latch | GPIO38 HIGH early in boot (stock also gpio_hold_en) |
@@ -29,15 +29,15 @@ unmapped. The bottom hint bar shows three hints (Back / Select / Next) over the 
 ## Battery
 
 `BatteryMonitor` reads ADC2 ch2 (GPIO13) with a 2x divider. The divider is only connected while GPIO43 is HIGH, so each read
-releases the pad hold, drives GPIO43 high for 20 ms, averages 16 samples, then drops it low and re-holds it (stock
-`Device::getBatteryVoltage()`). ADC2 is unreadable while Wi-Fi runs; a failed read keeps the last good value instead of showing 0%. A good reading is cached for 10 s because the
+releases the pad hold, drives GPIO43 high for 20 ms, averages up to 16 samples (a sample under 500 mV at the pin counts as a failed read), then drops it low and re-holds it (stock
+`Device::getBatteryVoltage()`). The read is serialised with a mutex. ADC2 is unreadable while Wi-Fi runs; a failed read keeps the last good value instead of showing 0%. A good reading is cached for 10 s because the
 status bar asks on every page render and a read blocks for ~20 ms.
 The percentage uses the SDK's generic Li-ion table, not the stock 6-point table.
 
 ## Sleep
 
-Like stock, "sleep" is deep sleep with the GPIO38 latch held (the board stays powered). `PowerManager` wakes it from any of the seven
-buttons (EXT1 any-low, RTC pull-ups, GPIO 0-6 are all RTC pins) and waits up to 5 s for a held button to be released first. The power
+Like stock, "sleep" is deep sleep with the GPIO38 latch held (the board stays powered). `PowerManager` wakes it from any of the
+GPIO 0-6 inputs (EXT1 any-low, RTC pull-ups, GPIO 0-6 are all RTC pins) and waits up to 5 s for a held button to be released first. The power
 button (GPIO42) is not an RTC pin and cannot wake deep sleep; USB (GPIO15) is not a wake source yet. A hard power-off (CrossPoint: hold the power button) releases the GPIO38 latch and drives it low, as stock `Device::shutdown()` does; the physical
 power button then cold-boots the board, and it has to be held for ~3 s because the rail is only latched once firmware has booted. With USB attached
 the rail stays up and the board behaves like standby.
@@ -57,7 +57,7 @@ portrait orientation handles the 90 degree rotation.
 
 ## Not done
 
-Right panel; USB wake; LED/rumble; grayscale (B/W only).
+USB wake; LED/rumble; grayscale (B/W only).
 
 ## Credits and licence
 

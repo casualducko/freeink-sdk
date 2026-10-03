@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <mutex>
 
 #if FREEINK_BATTERY_I2C_GAUGE
 #include <Wire.h>
@@ -487,16 +488,23 @@ namespace {
 // The gate idles LOW with a pad hold so the divider does not drain the cell, including in deep sleep.
 constexpr int8_t DIPTYX_BATTERY_SENSE_GATE = 43;
 constexpr int DIPTYX_ADC_SAMPLES = 16;
+// A real sample is at least ~1 V at the pin (a 2 V cell through the x2 divider). Below that is a failed ADC2 read
+// (the Wi-Fi driver owns ADC2 while it runs), which must not be averaged in as a very low battery.
+constexpr uint32_t DIPTYX_ADC_MIN_VALID_MV = 500;
 
 // Returns millivolts at the cell (divider applied), or 0 when no valid sample was read. The pin is ADC2,
 // which the Wi-Fi driver owns while it is running, so reads can fail; the caller keeps the last good value.
 uint16_t readDiptyxBatteryMillivolts(int8_t adcPin, float dividerMultiplier) {
+  static std::mutex readMutex;  // the sense gate and the shared statics are touched by whichever task asks
+  std::lock_guard<std::mutex> lock(readMutex);
   static uint16_t lastGoodMv = 0;
   static unsigned long lastReadMs = 0;
   // The status bar asks for the level on every page render (twice per turn in the two-page spread). A read blocks for
   // ~20 ms and drives the sense gate, so serve a recent value instead of sampling every time.
   constexpr unsigned long CACHE_MS = 10000;
-  if (lastGoodMv != 0 && millis() - lastReadMs < CACHE_MS) return lastGoodMv;
+  // With no good value yet (reads failing), retry at most once a second instead of blocking every call.
+  const unsigned long sinceRead = millis() - lastReadMs;
+  if (lastGoodMv != 0 ? sinceRead < CACHE_MS : (lastReadMs != 0 && sinceRead < 1000)) return lastGoodMv;
   lastReadMs = millis();
   const auto gate = static_cast<gpio_num_t>(DIPTYX_BATTERY_SENSE_GATE);
   gpio_hold_dis(gate);
@@ -507,7 +515,7 @@ uint16_t readDiptyxBatteryMillivolts(int8_t adcPin, float dividerMultiplier) {
   int valid = 0;
   for (int i = 0; i < DIPTYX_ADC_SAMPLES; i++) {
     const uint32_t mv = analogReadMilliVolts(adcPin);
-    if (mv > 0) {
+    if (mv >= DIPTYX_ADC_MIN_VALID_MV) {
       sum += mv;
       valid++;
     }
