@@ -4,6 +4,8 @@
 // build free of the wolfSSL dependency while leaving a single, well-defined
 // integration point for the TLS 1.3 transport.
 #if defined(FREEINK_NET_WOLFSSL)
+#include <IPAddress.h>
+#include <lwip/netdb.h>
 #include <wolfssl/ssl.h>
 #endif
 
@@ -53,6 +55,24 @@ bool isWantIo(const int err) {
   // an out-of-memory handshake spin until the deadline instead of failing fast.
   return err == WOLFSSL_ERROR_WANT_READ || err == WOLFSSL_ERROR_WANT_WRITE;
 }
+
+// Resolves `host` to an IPv4 address with the sockets resolver. WiFiClient::connect(host, port) goes through the Arduino
+// core's NetworkManager::hostByName, which calls the raw lwIP dns_clear_cache() from the caller's task whenever the
+// interfaces' address state changed since its previous lookup (an IPv6 address appearing after Wi-Fi came up, say). That
+// call asserts ("Required to lock TCPIP core functionality") when the DNS cache holds entries and crashed the device
+// mid-sync. getaddrinfo() is the thread-safe entry point the core uses afterwards anyway.
+bool resolveIPv4(const char* host, IPAddress& out) {
+  if (out.fromString(host)) return true;  // already a literal address
+  struct addrinfo hints = {};
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+  struct addrinfo* res = nullptr;
+  if (lwip_getaddrinfo(host, "0", &hints, &res) != 0 || res == nullptr) return false;
+  const bool ok = res->ai_family == AF_INET && res->ai_addr != nullptr;
+  if (ok) out = IPAddress(reinterpret_cast<const uint8_t*>(&reinterpret_cast<const sockaddr_in*>(res->ai_addr)->sin_addr.s_addr));
+  lwip_freeaddrinfo(res);
+  return ok;
+}
 }  // namespace
 
 int SecureClient::connectWithMethod(const char* host, uint16_t port, void* method, const char* label) {
@@ -70,7 +90,12 @@ int SecureClient::connectWithMethod(const char* host, uint16_t port, void* metho
   const uint32_t timeoutMs = getTimeout();
   if (abortRequested()) return 0;
   _transport.setConnectionTimeout(timeoutMs);
-  if (!_transport.connect(host, port)) {
+  IPAddress ip;
+  if (!resolveIPv4(host, ip)) {
+    if (Serial) Serial.printf("[SecureClient] DNS lookup failed (%s): %s\n", label, host);
+    return 0;
+  }
+  if (!_transport.connect(ip, port)) {
     if (Serial) Serial.printf("[SecureClient] TCP connect failed (%s): %s:%u\n", label, host, port);
     return 0;
   }
