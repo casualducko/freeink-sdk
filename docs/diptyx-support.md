@@ -58,3 +58,10 @@ portrait orientation handles the 90 degree rotation.
 ## Not done
 
 Right panel; USB wake; LED/rumble; grayscale (B/W only).
+
+## Credits and licence
+
+The Diptyx panel driver, pin map, waveform values and settings handling are derived from the stock Diptyx firmware
+(https://github.com/MartijndenHoed/Diptyx), MIT licensed, Copyright (c) 2026 Diptyx. This board support is offered under the SDK's
+MIT licence (see `LICENSE` and `NOTICE`). Firmware built from it together with CrossPoint also contains GPL-2.0 and other third-party
+components; the distribution-level notice is in the crosspoint-diptyx repository (`NOTICE`).
