@@ -1889,7 +1889,7 @@ constexpr BoardProfile ONEPAGE = {
 // uploads the stock register LUTs (the OTP waveforms are not used) and inverts the
 // framebuffer (1 = black on this panel/CDI setting).
 // SD is SDMMC 1-bit: CLK 41 CMD 40 D0 39. Buttons are active-low with pull-ups, tested on
-// hardware: page-left 5, joystick press 0 (boot pin), up 2, down 3, page-right 6. The stock source also names
+// hardware: page-left 5, centre button press 0 (boot pin), up 2, down 3, page-right 6. The stock source also names
 // arrow-left 1 / arrow-right 4, but nothing reached them on the tested unit (a rocker, not a 5-way joystick). Power latch GPIO38 must be driven HIGH early.
 // Battery sense: ADC2 ch2 = GPIO13, x2 divider, gated by GPIO43 HIGH (BatteryMonitor handles the gate).
 // Stock firmware pin roles: GPIO16 = USB VBUS detect, GPIO42 = power button (active-high), GPIO15 = USB wake trigger.
@@ -1903,10 +1903,10 @@ constexpr BoardProfile DIPTYX = {
     {11, 12, 10, 9, 8, 7, PIN_UNASSIGNED},  // SCLK MOSI CS DC RST BUSY (left panel)
     7000000,                                // displaySpiHz: stock 7 MHz
     {PIN_UNASSIGNED, PIN_UNASSIGNED, PIN_UNASSIGNED, PIN_UNASSIGNED, PIN_UNASSIGNED, false, 0},
-    // Layout (user-chosen): back=page-left(5), confirm=joystick press(0), right=page-right(6) = Next/Down,
-    // left=GPIO1 (not connected on the tested unit; no bottom hint), up/down = joystick up/down (2/3),
+    // Layout (user-chosen): back=page-left(5), confirm=centre button press(0), right=page-right(6) = Next/Down,
+    // left=GPIO1 (not connected on the tested unit; no bottom hint), up/down = centre button up/down (2/3),
     // power=GPIO42 (the physical power button, active-HIGH, from the stock firmware; not an RTC pin, so
-    // it cannot wake deep sleep — the seven buttons do, see PowerManager). Joystick-right (4) is unmapped.
+    // it cannot wake deep sleep — the seven buttons do, see PowerManager). Centre-button right (4) is unmapped.
     // The bottom hint bar draws three hints over the three bottom buttons (see the themes).
     {5, 0, 1, 6, 2, 3, 42, true},
     13,              // batteryAdc: ADC2 ch2 behind a divider gated by GPIO43 HIGH (BatteryMonitor drives the gate)

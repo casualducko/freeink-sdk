@@ -16,7 +16,7 @@ namespace freeink {
 namespace {
 // Diptyx has no dedicated power key: the stock firmware sleeps with the GPIO38 latch held (the board stays
 // powered) and wakes on ANY of the seven buttons via EXT1, using RTC pull-ups. All are RTC-capable (<= 21).
-// Order: page-left, arrow-left*, joystick press (boot pin), up, down, arrow-right*, page-right. (* named in the stock source;
+// Order: page-left, arrow-left*, centre button press (boot pin), up, down, arrow-right*, page-right. (* named in the stock source;
 // not connected on the tested unit, where the idle pull-up keeps them high, so listing them is harmless.)
 // The USB trigger (GPIO15) is deliberately not a wake source yet: its polarity is unverified, and an
 // already-low pin would wake the device straight back up.
