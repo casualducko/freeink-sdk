@@ -185,7 +185,9 @@ void DiptyxDriver::begin(EpdBus& bus) {
 
 void DiptyxDriver::display(EpdBus& bus, const uint8_t* fb, const uint8_t* prev, RefreshMode mode, bool turnOff) {
   (void)prev;
-  const bool full = (mode != RefreshMode::Fast) || _partialsRemaining == 0;
+  // turnOff carries the Sunlight Fading Fix: with it on, every refresh uses the full waveform (darker blacks, with a
+  // flash), whatever the refresh mode asked for.
+  const bool full = (mode != RefreshMode::Fast) || _partialsRemaining == 0 || turnOff;
   if (full) {
     _partialsRemaining = kMaxPartialsInRow;
   } else {
@@ -196,7 +198,6 @@ void DiptyxDriver::display(EpdBus& bus, const uint8_t* fb, const uint8_t* prev, 
   bus.cmd(CMD_DISPLAY_REFRESH);
   bus.waitBusy(" diptyx_DRF");
   // The stock firmware powers the panel rail off after every refresh; the next one re-inits anyway.
-  (void)turnOff;
   bus.cmd(CMD_POWER_OFF);
   bus.waitBusy(" diptyx_POF");
   _isScreenOn = false;
