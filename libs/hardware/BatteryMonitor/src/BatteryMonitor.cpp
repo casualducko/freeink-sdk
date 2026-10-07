@@ -715,6 +715,18 @@ uint16_t BatteryMonitor::percentageFromMillivolts(uint16_t millivolts) {
   // cubic this table replaced evaluated to +7501 at 0 V and clamped to a
   // confident 100%, so an I2C or ADC failure showed a full battery.
   if (millivolts >= LIION_NOTCH_MV[10]) return 100;
+#if FREEINK_DEVICE_DIPTYX
+  if (BoardConfig::isDiptyx()) {
+    // Diptyx: linear between the notches, so a few mV of noise moves the value a point or so, not a whole 10% step.
+    for (uint8_t i = 10; i > 0; --i) {
+      if (millivolts >= LIION_NOTCH_MV[i - 1]) {
+        const uint32_t span = LIION_NOTCH_MV[i] - LIION_NOTCH_MV[i - 1];
+        return static_cast<uint16_t>((i - 1) * 10 + (millivolts - LIION_NOTCH_MV[i - 1]) * 10U / span);
+      }
+    }
+    return 0;
+  }
+#endif
   // Round at the midpoint of each segment instead of flooring, so a cell resting
   // just below 4.20 V straight off the charger still reads 100%.
   for (uint8_t i = 10; i > 0; --i) {
